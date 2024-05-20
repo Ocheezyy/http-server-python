@@ -9,8 +9,8 @@ def main():
     # Uncomment this to pass the first stage
     #
     server_socket = socket.create_server(("localhost", 4221), reuse_port=True)
-    server_socket.accept() # wait for client
-    server_socket.send("HTTP/1.1\r\n200\r\nOK\r\n")
+    req_sock, req_addr = server_socket.accept() # wait for client
+    req_sock.send(bytes("HTTP/1.1 200 OK\r\n\r\n", "utf-8"))
 
 
 if __name__ == "__main__":

@@ -42,14 +42,21 @@ def handle_encoding(headers: list[str]) -> str:
     encoding_type: str = ""
     if len(encoding_header_lst) != 0:
         encoding_header = encoding_header_lst[0]
-        print(encoding_header)
-        encoding_type = encoding_header.lower().replace("accept-encoding: ", "")
+        # print(encoding_header)
+        accept_encoding = encoding_header.lower().replace("accept-encoding: ", "")
+        if ", " in accept_encoding:
+            possible_encodings = accept_encoding.split(", ")
+            for encoding in possible_encodings:
+                if encoding in ACCEPTED_ENCODING_TYPES:
+                    encoding_type = encoding
+        else:
+            encoding_type = accept_encoding
         if encoding_type not in ACCEPTED_ENCODING_TYPES:
             encoding_type = ""
     return encoding_type
 
 
-def base_req_handler(req_sock: socket.socket, req_address):
+def base_req_handler(req_sock: socket.socket, req_address) -> None:
     req_bytes: bytes = req_sock.recv(1024)
     req: str = req_bytes.decode()
     req_lines: list[str] = req.splitlines()

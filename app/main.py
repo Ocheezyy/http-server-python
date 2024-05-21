@@ -51,7 +51,7 @@ def user_agent_route(headers: list[str]) -> RouteMethodRes:
     }
 
 def file_route(full_req_path) -> RouteMethodRes:
-    file_name = full_req_path.replace("/files/", " ")
+    file_name = full_req_path.replace("/files/", "")
     file_path = os.path.join(DIRECTORY, file_name)
     if not os.path.exists(file_path):
         return {

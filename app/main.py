@@ -28,6 +28,16 @@ def echo_route(full_req_path: str) -> RouteMethodRes:
         "headers": ["Content-Type: text/plain", f"Content-Length: {len(echo_str)}"]
     }
 
+def user_agent_route(headers: list[str]) -> RouteMethodRes:
+    user_agent_header: str = next(x for x in headers if "user-agent" in x.lower())
+
+    user_agent: str = user_agent_header.split(" ")[1].rstrip("\r\n")
+    return {
+        "status": 200,
+        "msg": "OK",
+        "body": user_agent,
+        "headers": ["Content-Type: text/plain", f"Content-Length: {len(user_agent)}"]
+    }
 
 def send_response(sock: socket.socket, res_msg: str) -> None:
     sock.send(bytes(res_msg, "utf-8"))
@@ -76,6 +86,8 @@ def main():
         res_obj = index_route()
     elif req_path.startswith("/echo"):
         res_obj = echo_route(req_path)
+    elif req_path.startswith("/user-agent"):
+        res_obj = user_agent_route(headers=req_lines)
     else:
         send_404(req_sock, req_http_ver)
         return

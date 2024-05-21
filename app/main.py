@@ -2,13 +2,18 @@
 from typing import TypedDict
 import threading
 import socket
+import os
 import re
+import sys
 
 
 PATH_REGEX = r".+?(?=\/)"
 AVAILABLE_PATHS: list[str] = ["/", "/echo", "/user-agent"]
 PORT: int = 4221
 HOST: str = "localhost"
+DIRECTORY: str = sys.argv[2] if len(sys.argv) > 2 else ""
+
+print(DIRECTORY)
 
 
 class RouteMethodRes(TypedDict):
@@ -45,6 +50,27 @@ def user_agent_route(headers: list[str]) -> RouteMethodRes:
         "headers": ["Content-Type: text/plain", f"Content-Length: {len(user_agent)}"]
     }
 
+def file_route(full_req_path) -> RouteMethodRes:
+    file_name = full_req_path.replace("/files/", " ")
+    file_path = os.path.join(DIRECTORY, file_name)
+    if not os.path.exists(file_path):
+        return {
+            "status": 404,
+            "msg": "Not Found",
+            "body": "",
+            "headers": []
+        }
+
+    with open (file_path, "r") as reader:
+        contents = reader.read()
+
+    return {
+        "status": 200,
+        "msg": "OK",
+        "body": contents,
+        "headers": ["Content-Type: text/plain", f"Content-Length: {len(contents)}"]
+    }
+
 def send_response(sock: socket.socket, res_msg: str) -> None:
     sock.send(bytes(res_msg, "utf-8"))
 
@@ -79,6 +105,8 @@ def base_req_handler(req_sock: socket.socket, req_address):
         res_obj = echo_route(req_path)
     elif req_path.startswith("/user-agent"):
         res_obj = user_agent_route(headers=req_lines)
+    elif req_path.startswith("/files"):
+        res_obj = file_route(req_path)
     else:
         send_404(req_sock, req_http_ver)
         return

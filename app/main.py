@@ -3,6 +3,8 @@ from typing import TypedDict
 import socket
 import re
 
+
+
 class RouteMethodRes(TypedDict):
     status: int
     msg: str
@@ -34,7 +36,7 @@ def send_500(sock: socket.socket, http_ver: str) -> None:
     send_response(sock, f"{http_ver} 500 Internal Server Error\r\n\r\n")
 
 def send_404(sock: socket.socket, http_ver: str) -> None:
-    send_response(sock, f"{http_ver} {404} Not Found\r\n\r\n")
+    send_response(sock, f"{http_ver} 404 Not Found\r\n\r\n")
 
 def build_response(res_obj: RouteMethodRes, http_ver: str) -> str:
     res_str = f"{http_ver} {res_obj['status']} {res_obj['msg']}\r\n"
@@ -68,25 +70,34 @@ def main():
     req_lines.pop(0) # Removes verb and version
     # Need to add header handling here
 
+    print(f"request path: {req_path}")
     res_obj: RouteMethodRes
     if req_path == "/":
         res_obj = index_route()
+    elif req_path.startswith("/echo"):
+        res_obj = echo_route(req_path)
+    else:
+        send_404(req_sock, req_http_ver)
+        return
 
-    if req_path != "/":
-        re_req = re.search(PATH_REGEX, req_path)
-        if not re_req:
-            send_500(req_sock, req_http_ver)
-            return
-        req_base_path = re_req.group(0)
-        if req_base_path not in AVAILABLE_PATHS:
-            send_404(req_sock, req_http_ver)
-            return
-        match req_base_path:
-            case "/echo":
-                res_obj = echo_route(req_path)
-            case _:
-                send_500(req_sock, req_http_ver)
-                return
+    # if req_path != "/":
+    #     re_req = re.search(PATH_REGEX, req_path)
+    #     if not re_req:
+    #         print("Regex on path failed")
+    #         send_500(req_sock, req_http_ver)
+    #         return
+    #     req_base_path = re_req.group(0)
+    #     if req_base_path not in AVAILABLE_PATHS:
+    #         print("Path not recognized")
+    #         send_404(req_sock, req_http_ver)
+    #         return
+    #     match req_base_path:
+    #         case "/echo":
+    #             res_obj = echo_route(req_path)
+    #         case _:
+    #             print("Default match statement reached")
+    #             send_500(req_sock, req_http_ver)
+    #             return
 
     res_str = build_response(res_obj, req_http_ver)
     send_response(req_sock, res_str)

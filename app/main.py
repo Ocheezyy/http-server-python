@@ -11,8 +11,10 @@ AVAILABLE_PATHS: list[str] = ["/", "/echo", "/user-agent"]
 PORT: int = 4221
 HOST: str = "localhost"
 DIRECTORY: str = sys.argv[2] if len(sys.argv) > 2 else ""
+ACCEPTED_ENCODING_TYPES: list[str] = ["gzip"]
 
 print(DIRECTORY)
+
 
 def send_response(sock: socket.socket, res_msg: str) -> None:
     sock.send(bytes(res_msg, "utf-8"))
@@ -23,13 +25,29 @@ def send_500(sock: socket.socket, http_ver: str) -> None:
 def send_404(sock: socket.socket, http_ver: str) -> None:
     send_response(sock, f"{http_ver} 404 Not Found\r\n\r\n")
 
-def build_response(res_obj: RouteMethodRes, http_ver: str) -> str:
+def build_response(res_obj: RouteMethodRes, http_ver: str, encoding: str) -> str:
     res_str = f"{http_ver} {res_obj['status']} {res_obj['msg']}\r\n"
     if len(res_obj["headers"]) != 0:
         res_str += "\r\n".join(res_obj["headers"])
 
+    if (encoding != ""):
+        res_str += f"\r\nContent-Encoding: {encoding}"
+
     res_str += f"\r\n\r\n{res_obj['body']}"
     return res_str
+
+
+def handle_encoding(headers: list[str]) -> str:
+    encoding_header_lst: list[str] = list(filter(lambda x: "accept-encoding" in x.lower(), headers))
+    encoding_type: str = ""
+    if len(encoding_header_lst) != 0:
+        encoding_header = encoding_header_lst[0]
+        print(encoding_header)
+        encoding_type = encoding_header.lower().replace("accept-encoding: ", "")
+        if encoding_type not in ACCEPTED_ENCODING_TYPES:
+            encoding_type = ""
+    return encoding_type
+
 
 def base_req_handler(req_sock: socket.socket, req_address):
     req_bytes: bytes = req_sock.recv(1024)
@@ -54,6 +72,9 @@ def base_req_handler(req_sock: socket.socket, req_address):
         send_404(req_sock, req_http_ver)
         return
 
+    encoding_type: str = handle_encoding(req_lines)
+
+    # Leaving here in case I want to create a more complex routing handler
     # if req_path != "/":
     #     re_req = re.search(PATH_REGEX, req_path)
     #     if not re_req:
@@ -73,7 +94,7 @@ def base_req_handler(req_sock: socket.socket, req_address):
     #             send_500(req_sock, req_http_ver)
     #             return
 
-    res_str = build_response(res_obj, req_http_ver)
+    res_str = build_response(res_obj, req_http_ver, encoding_type)
     send_response(req_sock, res_str)
 
 

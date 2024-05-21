@@ -1,8 +1,14 @@
 # Uncomment this to pass the first stage
 from typing import TypedDict
+import threading
 import socket
 import re
 
+
+PATH_REGEX = r".+?(?=\/)"
+AVAILABLE_PATHS: list[str] = ["/", "/echo", "/user-agent"]
+PORT: int = 4221
+HOST: str = "localhost"
 
 
 class RouteMethodRes(TypedDict):
@@ -56,22 +62,7 @@ def build_response(res_obj: RouteMethodRes, http_ver: str) -> str:
     res_str += f"\r\n\r\n{res_obj['body']}"
     return res_str
 
-
-def main():
-    PATH_REGEX = r".+?(?=\/)"
-    AVAILABLE_PATHS: list[str] = ["/", "/echo"]
-    # Look into this methods logic to allow for a one line call of any path
-    PATH_METHODS: dict[str, function] = {
-        "/": index_route,
-        "/echo": echo_route
-    }
-    PORT: int = 4221
-    HOST: str = "localhost"
-    # You can use print statements as follows for debugging, they'll be visible when running tests.
-    print("Logs from your program will appear here!")
-
-    server_socket = socket.create_server((HOST, PORT), reuse_port=True)
-    req_sock, req_addr = server_socket.accept() # wait for client
+def base_req_handler(req_sock: socket.socket, req_address):
     req_bytes: bytes = req_sock.recv(1024)
     req: str = req_bytes.decode()
     req_lines: list[str] = req.splitlines()
@@ -113,6 +104,16 @@ def main():
 
     res_str = build_response(res_obj, req_http_ver)
     send_response(req_sock, res_str)
+
+
+def main():
+    # You can use print statements as follows for debugging, they'll be visible when running tests.
+    print("Logs from your program will appear here!")
+
+    server_socket = socket.create_server((HOST, PORT), reuse_port=True)
+    while True:
+        req_sock, req_addr = server_socket.accept() # wait for client
+        threading.Thread(target=base_req_handler, args=(req_sock, req_addr)).start()
 
 
 if __name__ == "__main__":

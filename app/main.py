@@ -77,7 +77,7 @@ def file_route(full_req_path: str, http_verb: str, req_body: str) -> RouteMethod
 
         return {
             "status": 201,
-            "msg": "OK",
+            "msg": "Created",
             "body": "",
             "headers": []
         }

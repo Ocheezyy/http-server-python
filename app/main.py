@@ -68,7 +68,7 @@ def file_route(full_req_path) -> RouteMethodRes:
         "status": 200,
         "msg": "OK",
         "body": contents,
-        "headers": ["Content-Type: text/plain", f"Content-Length: {len(contents)}"]
+        "headers": ["Content-Type: application/octet-stream", f"Content-Length: {len(contents)}"]
     }
 
 def send_response(sock: socket.socket, res_msg: str) -> None:

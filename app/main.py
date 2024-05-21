@@ -1,5 +1,5 @@
 # Uncomment this to pass the first stage
-from typing import TypedDict
+from typing import LiteralString, TypedDict
 import threading
 import socket
 import os
@@ -50,26 +50,38 @@ def user_agent_route(headers: list[str]) -> RouteMethodRes:
         "headers": ["Content-Type: text/plain", f"Content-Length: {len(user_agent)}"]
     }
 
-def file_route(full_req_path) -> RouteMethodRes:
+def file_route(full_req_path: str, http_verb: str, req_body: str) -> RouteMethodRes:
     file_name = full_req_path.replace("/files/", "")
     file_path = os.path.join(DIRECTORY, file_name)
-    if not os.path.exists(file_path):
+    if http_verb == "GET":
+        if not os.path.exists(file_path):
+            return {
+                "status": 404,
+                "msg": "Not Found",
+                "body": "",
+                "headers": []
+            }
+
+        with open (file_path, "r") as reader:
+            contents = reader.read()
+
         return {
-            "status": 404,
-            "msg": "Not Found",
+            "status": 200,
+            "msg": "OK",
+            "body": contents,
+            "headers": ["Content-Type: application/octet-stream", f"Content-Length: {len(contents)}"]
+        }
+    elif http_verb == "POST":
+        with open (file_path, "w") as writer:
+            writer.write(req_body)
+
+        return {
+            "status": 201,
+            "msg": "OK",
             "body": "",
             "headers": []
         }
 
-    with open (file_path, "r") as reader:
-        contents = reader.read()
-
-    return {
-        "status": 200,
-        "msg": "OK",
-        "body": contents,
-        "headers": ["Content-Type: application/octet-stream", f"Content-Length: {len(contents)}"]
-    }
 
 def send_response(sock: socket.socket, res_msg: str) -> None:
     sock.send(bytes(res_msg, "utf-8"))
@@ -92,10 +104,10 @@ def base_req_handler(req_sock: socket.socket, req_address):
     req_bytes: bytes = req_sock.recv(1024)
     req: str = req_bytes.decode()
     req_lines: list[str] = req.splitlines()
-    req_lines.pop() # Remove empty space
+    req_lines.pop() if req_lines[-1] == "" else req_lines.pop(-2) # Could be problematic
     req_verb, req_path, req_http_ver = req_lines[0].split(" ")
     req_lines.pop(0) # Removes verb and version
-    # Need to add header handling here
+    # print(req_lines)
 
     print(f"request path: {req_path}")
     res_obj: RouteMethodRes
@@ -106,7 +118,7 @@ def base_req_handler(req_sock: socket.socket, req_address):
     elif req_path.startswith("/user-agent"):
         res_obj = user_agent_route(headers=req_lines)
     elif req_path.startswith("/files"):
-        res_obj = file_route(req_path)
+        res_obj = file_route(req_path, req_verb, req_lines[-1])
     else:
         send_404(req_sock, req_http_ver)
         return

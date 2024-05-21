@@ -31,7 +31,7 @@ def echo_route(full_req_path: str) -> RouteMethodRes:
 def user_agent_route(headers: list[str]) -> RouteMethodRes:
     user_agent_header: str = next(x for x in headers if "user-agent" in x.lower())
 
-    user_agent: str = user_agent_header.split(" ")[1].rstrip("\r\n")
+    user_agent: str = user_agent_header.split(": ")[1].rstrip("\r\n")
     return {
         "status": 200,
         "msg": "OK",

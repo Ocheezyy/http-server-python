@@ -30,42 +30,42 @@ def send_404(sock: socket.socket, http_ver: str) -> None:
 def build_response(res_obj: RouteMethodRes, http_ver: str, encoding: str):
     res_str = f"{http_ver} {res_obj['status']} {res_obj['msg']}{CRLF}"
     if len(res_obj["headers"]) != 0:
-        if encoding != "" and encoding in ACCEPTED_ENCODING_TYPES:
-            new_headers = list(filter(lambda x: "Content-Length" not in x, res_obj["headers"]))
-            res_str += CRLF.join(new_headers)
-        else:
-            res_str += CRLF.join(res_obj["headers"])
+        # if encoding != "" and encoding in ACCEPTED_ENCODING_TYPES:
+        #     new_headers = list(filter(lambda x: "Content-Length" not in x, res_obj["headers"]))
+        #     res_str += CRLF.join(new_headers)
+        # else:
+        res_str += CRLF.join(res_obj["headers"])
 
-    if encoding != "":
-        res_str += f"{CRLF}Content-Encoding: {encoding}"
-        if encoding == "gzip":
-            encoded_body = f"{CRLF}{CRLF}{res_obj['body']}".encode()
-            gzipped_body = gzip.compress(encoded_body)
-            # TODO: Content-length not working correctly
-            res_str += f"{CRLF}Content-Length: {len(encoded_body)}"
-            final_str = res_str.encode() + f"{CRLF}{CRLF}{gzipped_body}".encode()
-            return final_str
-    else:
-        res_str += f"{CRLF}{CRLF}{res_obj['body']}"
+    # if encoding != "":
+    #     res_str += f"{CRLF}Content-Encoding: {encoding}"
+    #     if encoding == "gzip":
+    #         encoded_body = f"{CRLF}{CRLF}{res_obj['body']}".encode()
+    #         gzipped_body = gzip.compress(encoded_body)
+    #         # TODO: Content-length not working correctly
+    #         res_str += f"{CRLF}Content-Length: {len(encoded_body)}"
+    #         final_str = res_str.encode() + f"{CRLF}{CRLF}{gzipped_body}".encode()
+    #         return final_str
+    # else:
+    res_str += f"{CRLF}{CRLF}{res_obj['body']}"
     return res_str
 
 
 
 
-def handle_encoding(headers: dict) -> str:
-    encoding_type: str = ""
-    if "accept-encoding" in headers:
-        encoding_header = headers["accept-encoding"]
-        if ", " in encoding_header:
-            possible_encodings = encoding_header.split(", ")
-            for encoding in possible_encodings:
-                if encoding in ACCEPTED_ENCODING_TYPES:
-                    encoding_type = encoding
-        else:
-            encoding_type = encoding_header
-        if encoding_type not in ACCEPTED_ENCODING_TYPES:
-            encoding_type = ""
-    return encoding_type
+# def handle_encoding(headers: dict) -> str:
+#     encoding_type: str = ""
+#     if "accept-encoding" in headers:
+#         encoding_header = headers["accept-encoding"]
+#         if ", " in encoding_header:
+#             possible_encodings = encoding_header.split(", ")
+#             for encoding in possible_encodings:
+#                 if encoding in ACCEPTED_ENCODING_TYPES:
+#                     encoding_type = encoding
+#         else:
+#             encoding_type = encoding_header
+#         if encoding_type not in ACCEPTED_ENCODING_TYPES:
+#             encoding_type = ""
+#     return encoding_type
 
 
 def read_headers(list_headers: list[str]) -> dict:
@@ -103,7 +103,8 @@ def base_req_handler(req_sock: socket.socket, req_address) -> None:
         return
 
 
-    encoding_type: str = handle_encoding(req_headers)
+    # encoding_type: str = handle_encoding(req_headers)
+    encoding_type: str = ""
     res_str = build_response(res_obj, req_http_ver, encoding_type)
     send_response(req_sock, res_str)
 

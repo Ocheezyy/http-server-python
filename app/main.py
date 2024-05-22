@@ -1,4 +1,5 @@
 from app.routes import RouteMethodRes, file_route, echo_route, user_agent_route, index_route
+import gzip
 import threading
 import socket
 import os
@@ -7,6 +8,7 @@ import sys
 
 
 PATH_REGEX = r".+?(?=\/)"
+CRLF = "\r\n"
 AVAILABLE_PATHS: list[str] = ["/", "/echo", "/user-agent"]
 PORT: int = 4221
 HOST: str = "localhost"
@@ -20,40 +22,59 @@ def send_response(sock: socket.socket, res_msg: str) -> None:
     sock.send(bytes(res_msg, "utf-8"))
 
 def send_500(sock: socket.socket, http_ver: str) -> None:
-    send_response(sock, f"{http_ver} 500 Internal Server Error\r\n\r\n")
+    send_response(sock, f"{http_ver} 500 Internal Server Error{CRLF}{CRLF}")
 
 def send_404(sock: socket.socket, http_ver: str) -> None:
-    send_response(sock, f"{http_ver} 404 Not Found\r\n\r\n")
+    send_response(sock, f"{http_ver} 404 Not Found{CRLF}{CRLF}")
 
 def build_response(res_obj: RouteMethodRes, http_ver: str, encoding: str) -> str:
-    res_str = f"{http_ver} {res_obj['status']} {res_obj['msg']}\r\n"
+    res_str = f"{http_ver} {res_obj['status']} {res_obj['msg']}{CRLF}"
     if len(res_obj["headers"]) != 0:
-        res_str += "\r\n".join(res_obj["headers"])
+        if encoding != "":
+            new_headers = list(filter(lambda x: "Content-Length" not in x, res_obj["headers"]))
+            res_str += CRLF.join(new_headers)
+        else:
+            res_str += CRLF.join(res_obj["headers"])
 
-    if (encoding != ""):
-        res_str += f"\r\nContent-Encoding: {encoding}"
+    if encoding != "":
+        res_str += f"{CRLF}Content-Encoding: {encoding}"
+        if encoding == "gzip":
+            encoded_body = gzip.compress(f"{CRLF}{CRLF}{res_obj['body']}".encode())
+            # TODO: Content-length not working correctly
+            res_str += f"{CRLF}Content-Length: {len(encoded_body)}"
+            res_str += f"{CRLF}{CRLF}{encoded_body}"
+        else:
+            res_str += f"{CRLF}{CRLF}{res_obj['body']}"
+    else:
+        res_str += f"{CRLF}{CRLF}{res_obj['body']}"
 
-    res_str += f"\r\n\r\n{res_obj['body']}"
     return res_str
 
 
-def handle_encoding(headers: list[str]) -> str:
-    encoding_header_lst: list[str] = list(filter(lambda x: "accept-encoding" in x.lower(), headers))
+def handle_encoding(headers: dict) -> str:
     encoding_type: str = ""
-    if len(encoding_header_lst) != 0:
-        encoding_header = encoding_header_lst[0]
-        # print(encoding_header)
-        accept_encoding = encoding_header.lower().replace("accept-encoding: ", "")
-        if ", " in accept_encoding:
-            possible_encodings = accept_encoding.split(", ")
+    if "accept-encoding" in headers:
+        encoding_header = headers["accept-encoding"]
+        if ", " in encoding_header:
+            possible_encodings = encoding_header.split(", ")
             for encoding in possible_encodings:
                 if encoding in ACCEPTED_ENCODING_TYPES:
                     encoding_type = encoding
         else:
-            encoding_type = accept_encoding
+            encoding_type = encoding_header
         if encoding_type not in ACCEPTED_ENCODING_TYPES:
             encoding_type = ""
     return encoding_type
+
+
+def read_headers(list_headers: list[str]) -> dict:
+    header_obj: dict = {}
+    for header in list_headers:
+        key, value = header.split(": ")
+        header_obj[key.lower()] = value
+
+    print(header_obj)
+    return header_obj
 
 
 def base_req_handler(req_sock: socket.socket, req_address) -> None:
@@ -63,7 +84,8 @@ def base_req_handler(req_sock: socket.socket, req_address) -> None:
     req_lines.pop() if req_lines[-1] == "" else req_lines.pop(-2) # Could be problematic
     req_verb, req_path, req_http_ver = req_lines[0].split(" ")
     req_lines.pop(0) # Removes verb and version
-    # print(req_lines)
+
+    req_headers = read_headers(req_lines)
 
     print(f"request path: {req_path}")
     res_obj: RouteMethodRes
@@ -72,34 +94,15 @@ def base_req_handler(req_sock: socket.socket, req_address) -> None:
     elif req_path.startswith("/echo"):
         res_obj = echo_route(req_path)
     elif req_path.startswith("/user-agent"):
-        res_obj = user_agent_route(headers=req_lines)
+        res_obj = user_agent_route(req_headers)
     elif req_path.startswith("/files"):
         res_obj = file_route(req_path, req_verb, req_lines[-1], DIRECTORY)
     else:
         send_404(req_sock, req_http_ver)
         return
 
-    encoding_type: str = handle_encoding(req_lines)
 
-    # Leaving here in case I want to create a more complex routing handler
-    # if req_path != "/":
-    #     re_req = re.search(PATH_REGEX, req_path)
-    #     if not re_req:
-    #         print("Regex on path failed")
-    #         send_500(req_sock, req_http_ver)
-    #         return
-    #     req_base_path = re_req.group(0)
-    #     if req_base_path not in AVAILABLE_PATHS:
-    #         print("Path not recognized")
-    #         send_404(req_sock, req_http_ver)
-    #         return
-    #     match req_base_path:
-    #         case "/echo":
-    #             res_obj = echo_route(req_path)
-    #         case _:
-    #             print("Default match statement reached")
-    #             send_500(req_sock, req_http_ver)
-    #             return
+    encoding_type: str = handle_encoding(req_headers)
 
     res_str = build_response(res_obj, req_http_ver, encoding_type)
     send_response(req_sock, res_str)

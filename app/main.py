@@ -27,10 +27,10 @@ def send_500(sock: socket.socket, http_ver: str) -> None:
 def send_404(sock: socket.socket, http_ver: str) -> None:
     send_response(sock, f"{http_ver} 404 Not Found{CRLF}{CRLF}")
 
-def build_response(res_obj: RouteMethodRes, http_ver: str, encoding: str) -> str:
+def build_response(res_obj: RouteMethodRes, http_ver: str, encoding: str):
     res_str = f"{http_ver} {res_obj['status']} {res_obj['msg']}{CRLF}"
     if len(res_obj["headers"]) != 0:
-        if encoding != "":
+        if encoding != "" and encoding in ACCEPTED_ENCODING_TYPES:
             new_headers = list(filter(lambda x: "Content-Length" not in x, res_obj["headers"]))
             res_str += CRLF.join(new_headers)
         else:
@@ -39,16 +39,17 @@ def build_response(res_obj: RouteMethodRes, http_ver: str, encoding: str) -> str
     if encoding != "":
         res_str += f"{CRLF}Content-Encoding: {encoding}"
         if encoding == "gzip":
-            encoded_body = gzip.compress(f"{CRLF}{CRLF}{res_obj['body']}".encode())
+            encoded_body = f"{CRLF}{CRLF}{res_obj['body']}".encode()
+            gzipped_body = gzip.compress(encoded_body)
             # TODO: Content-length not working correctly
             res_str += f"{CRLF}Content-Length: {len(encoded_body)}"
-            res_str += f"{CRLF}{CRLF}{encoded_body}"
-        else:
-            res_str += f"{CRLF}{CRLF}{res_obj['body']}"
+            final_str = res_str.encode() + f"{CRLF}{CRLF}{gzipped_body}".encode()
+            return final_str
     else:
         res_str += f"{CRLF}{CRLF}{res_obj['body']}"
-
     return res_str
+
+
 
 
 def handle_encoding(headers: dict) -> str:
@@ -103,7 +104,6 @@ def base_req_handler(req_sock: socket.socket, req_address) -> None:
 
 
     encoding_type: str = handle_encoding(req_headers)
-
     res_str = build_response(res_obj, req_http_ver, encoding_type)
     send_response(req_sock, res_str)
 
